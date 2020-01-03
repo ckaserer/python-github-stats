@@ -4,7 +4,7 @@
 # READ ONLY VARIABLES #
 #######################
 
-readonly PROGNAME=`basename "$0"`
+readonly PROG_NAME=`basename "$0"`
 readonly SCRIPT_HOME=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 #################### 
@@ -26,10 +26,14 @@ done
 ##########
 
 usage_message () {
-  echo """Usage:
-    $PROGNAME [OPT ..]
+  echo """
+  ${PROG_NAME} is designed to be used as part of your CI/CD to push a docker image to dockerhub. 
+      
+  Usage:
+    ${PROG_NAME} --docker-org <DOCKER_ORGANIZATION> --docker-repo <DOCKER_REPO> --docker-user <DOCKER_USER> --docker-pass <DOCKER_PASS> [OPT ..]
+      
       required
-        --docker-org)        ... target docker organization. This could be your username or a destinct organization
+        --docker-org)        ... target docker organization. This could be your username or an organization you have access to
         --docker-repo)       ... target docker repository
         --docker-user)       ... docker username with push privileges
         --docker-pass)       ... docker password
@@ -57,12 +61,12 @@ main () {
   local flag_is_pull_request=false
 
   # GETOPT
-  OPTS=`getopt -o dh --long dryrun,help,docker-org:,docker-repo:,docker-user:,docker-pass:,git-branch:,is-pull-request:,allow-push-from: -- "$@"`
+  local opts=`getopt -o dh --long dryrun,help,docker-org:,docker-repo:,docker-user:,docker-pass:,git-branch:,is-pull-request:,allow-push-from: -- "$@"`
   if [ $? != 0 ]; then
     echo_stderr "failed to fetch options via getopt"
     exit 1
   fi
-  eval set -- "${OPTS}"
+  eval set -- "${opts}"
   while true ; do
     case "${1}" in
       --docker-org) 
