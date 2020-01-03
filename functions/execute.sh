@@ -4,7 +4,7 @@
 # if command and dryrun=true are provided the command will be execuded
 # if command and dryrun=false (or no second argument is provided) 
 # the function will only print the command the command to stdout
-execute () {
+function execute () {
   local exec_command=$1
   local alt_text=${2:-${1}}
   local flag_dryrun=${3:-$FLAG_DRYRUN}
@@ -20,3 +20,6 @@ execute () {
 # with the same name is defined a second time
 readonly -f execute
 [ "$?" -eq "0" ] || return $?
+
+# Dependend functions
+# docker_login
