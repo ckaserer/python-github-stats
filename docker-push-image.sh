@@ -36,7 +36,7 @@ usage_message () {
       
       optional
         --git-branch)      ... if git-branch is not set to 'master' the script will not push the image to dockerhub
-        --is-pull-request) ... if pull-request is true, do nothing - allowed values ['true','false']. default: 'false'
+        --is-pull-request) ... if is-pull-request is true, do nothing - allowed values ['true','false','0','1']. default: 'false'
 
         -d | --dryrun)     ... dryrun
         -h | --help)       ... help"""
@@ -50,8 +50,9 @@ main () {
   local docker_repo=""
   local docker_user=""
   local docker_pass=""
+
   local git_branch="master"
-  local is_pull_request="false"
+  local flag_is_pull_request=false
 
   # GETOPT
   OPTS=`getopt -o dh --long dryrun,help,docker-org:,docker-repo:,docker-user:,docker-pass:,git-branch:,is-pull-request: -- "$@"`
@@ -85,10 +86,10 @@ main () {
       --is-pull-request) 
         case ${2} in
           true | 0)    
-            is_pull_request=true;
+            flag_is_pull_request=true;
             ;;
           false | 1)  
-            is_pull_request=false;
+            flag_is_pull_request=false;
             ;;
           *) 
             echo_stderr
@@ -135,7 +136,7 @@ main () {
   ####
   # CORE LOGIC
   
-  if ${is_pull_request}; then
+  if ${flag_is_pull_request}; then
     echo -e "Skipping - pull requests can not utilize encrypted variables.\nFor further information see: https://docs.travis-ci.com/user/pull-requests/#pull-requests-and-security-restrictions"
   else
     if [ "${git_branch}" == "master" ]; then
