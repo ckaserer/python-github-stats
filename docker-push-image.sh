@@ -29,17 +29,18 @@ usage_message () {
   echo """Usage:
     $PROGNAME [OPT ..]
       required
-        --docker-org)      ... target docker organization. This could be your username or a destinct organization
-        --docker-repo)     ... target docker repository
-        --docker-user)     ... docker username with push privileges
-        --docker-pass)     ... docker password
+        --docker-org)        ... target docker organization. This could be your username or a destinct organization
+        --docker-repo)       ... target docker repository
+        --docker-user)       ... docker username with push privileges
+        --docker-pass)       ... docker password
       
       optional
-        --git-branch)      ... if git-branch is not set to 'master' the script will not push the image to dockerhub
-        --is-pull-request) ... if is-pull-request is true, do nothing - allowed values ['true','false','0','1']. default: 'false'
+        --git-branch)        ... if git-branch is not set to 'master' the script will not push the image to dockerhub
+        --is-pull-request)   ... if is-pull-request is true, do nothing - allowed values ['true','false','0','1']. default: 'false'
+        --allow-push-from)   ... regex for branches that are allowed to trigger a push to dockerhub. default: 'master'
 
-        -d | --dryrun)     ... dryrun
-        -h | --help)       ... help"""
+        -d | --dryrun)       ... dryrun
+        -h | --help)         ... help"""
 }
 readonly -f usage_message
 [ "$?" -eq "0" ] || return $?
@@ -51,11 +52,12 @@ main () {
   local docker_user=""
   local docker_pass=""
 
+  local allow_push_from="master"
   local git_branch="master"
   local flag_is_pull_request=false
 
   # GETOPT
-  OPTS=`getopt -o dh --long dryrun,help,docker-org:,docker-repo:,docker-user:,docker-pass:,git-branch:,is-pull-request: -- "$@"`
+  OPTS=`getopt -o dh --long dryrun,help,docker-org:,docker-repo:,docker-user:,docker-pass:,git-branch:,is-pull-request:,allow-push-from: -- "$@"`
   if [ $? != 0 ]; then
     echo_stderr "failed to fetch options via getopt"
     exit 1
@@ -81,6 +83,10 @@ main () {
         ;; 
       --git-branch) 
         git_branch=${2}
+        shift 2
+        ;; 
+      --allow-push-from)
+        allow_push_from=${2}
         shift 2
         ;; 
       --is-pull-request) 
@@ -119,12 +125,14 @@ main () {
   ####
   # CHECK INPUT
   # check if all required options are given
+  
+  check_for_pull_request ${flag_is_pull_request}
 
   # if [ -z "$VAR" ]; This will return true if a variable is unset or set to the empty string ("").
   if [ -z "${docker_org}" ] || [ -z "${docker_repo}" ] || [ -z "${docker_user}" ] || [ -z "${docker_pass}" ]; then
       echo_stderr
       echo_stderr "please provide all required options"
-      echo_stderr "--docker-org = ${docker_org}"
+      echo_stderr "--docker-org  = ${docker_org}"
       echo_stderr "--docker-repo = ${docker_repo}"
       echo_stderr "--docker-user = ${docker_user}"
       echo_stderr "--docker-pass = (hidden)"
@@ -132,17 +140,16 @@ main () {
       usage_message
       return 1
   fi
- 
+  
   ####
   # CORE LOGIC
   
-  if ${flag_is_pull_request}; then
-    echo -e "Skipping - pull requests can not utilize encrypted variables.\nFor further information see: https://docs.travis-ci.com/user/pull-requests/#pull-requests-and-security-restrictions"
+  if cmp_regex ${git_branch} ${allow_push_from}; then
+    docker_login ${docker_user} ${docker_pass}
+    execute "docker push ${docker_org}/${docker_repo}"
   else
-    if [ "${git_branch}" == "master" ]; then
-      execute "echo \"${docker_pass}\" | docker login -u \"${docker_user}\" --password-stdin" "Docker Login (hidden)"
-      execute "docker push ${docker_org}/${docker_repo}"
-    fi
+    echo "Info: branch '${git_branch}' did not meet the regex '${allow_push_from}'"
+    echo "Info: no action taken"
   fi
 }
  
