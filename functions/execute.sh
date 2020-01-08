@@ -10,8 +10,8 @@ function execute () {
   local flag_dryrun=${3:-$FLAG_DRYRUN}
 
   if [[ "${flag_dryrun}" == false ]]; then
-     echo "+ ${alt_text}"
-     eval "${exec_command}"
+    echo "+ ${alt_text}"
+    eval "${exec_command}"
   else
     echo "${exec_command}"
   fi
