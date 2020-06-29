@@ -8,9 +8,14 @@ import datetime
 import github
 import json
 from typing import TypeVar
+from flask_cors import CORS
+
 
 # Initialize Flask
 app = Flask(__name__)
+app.config['CORS_HEADERS'] = 'Content-Type'
+cors = CORS(app)
+
 
 # Setup Flask Restful framework
 api = Api(app)
@@ -70,13 +75,13 @@ class GitHubTrafficCheck(Queryable):
         return self.get()
 
 class GitHubViewTraffic(Queryable):
-    def get(self):   
-        result = self.executeQueryJson(f"SELECT repo,viewDate,viewCount,uniques FROM repostats ORDER BY viewDate DESC")   
+    def get(self, org, repo):   
+        result = self.executeQueryJson(f"SELECT repo,viewDate,viewCount,uniques FROM repostats WHERE repo = '{org}/{repo}' ORDER BY viewDate DESC")   
         return result, 200
 
-    def post(self):   
-        return self.get()
+    def post(self, org, repo):   
+        return self.get(org, repo)
     
 # Create API routes
 api.add_resource(GitHubTrafficCheck, '/collect')
-api.add_resource(GitHubViewTraffic, '/views')
+api.add_resource(GitHubViewTraffic, '/view', '/view/<org>/<repo>')
