@@ -4,8 +4,10 @@ from flask import Flask
 from flask_restful import reqparse, abort, Api, Resource
 import pyodbc
 import time
+import datetime
 import github
 import json
+from typing import TypeVar
 
 # Initialize Flask
 app = Flask(__name__)
@@ -14,12 +16,10 @@ app = Flask(__name__)
 api = Api(app)
 
 # Create connection to Azure SQL
-#conn = pyodbc.connect(os.environ['WWIF'])
+conn = pyodbc.connect(os.environ['WWIF'])
 
-GITHUB_ORG = os.environ['GITHUB_ORG']
-GITHUB_USER = os.environ['GITHUB_USER']
-GITHUB_PASSWORD = os.environ['GITHUB_PASSWORD']
-#GITHUB_ACCESS_TOKEN = os.environ['GITHUB_ACCESS_TOKEN']
+GITHUB_ORG = os.getenv('GITHUB_ORG', None)
+GITHUB_TOKEN = os.getenv('GITHUB_TOKEN', None)
 
 class Queryable(Resource):
     def executeQueryJson(self, myquery):
@@ -31,60 +31,52 @@ class Queryable(Resource):
             result = []
             for row in cursor.fetchall():
                 result.append(dict(zip(columns, row)))
-            cursor.commit()    
-        except:
-            print("Unexpected error:", sys.exc_info()[0])
-            raise
+            cursor.commit()
         finally:    
             cursor.close()
         return result
 
+
 class GitHubTrafficCheck(Queryable):
     def get(self):   
-        # if GITHUB_ACCESS_TOKEN is None and (GITHUB_USER is None or GITHUB_PASSWORD is None):
-        #     sys.exit('You need to provide either github username & password or github access token: set env GITHUB_USER, GITHUB_PASSWORD, GITHUB_ACCESS_TOKEN')
-        # if GITHUB_ACCESS_TOKEN is not None and GITHUB_USER is None and GITHUB_ORG is None:
-        #     sys.exit('When providing access token, please provide either repo user or repo org: set env GITHUB_USER, GITHUB_ORG')
+        if GITHUB_ORG is None or GITHUB_TOKEN is None:
+            sys.exit('You need to provide github org & token: set env GITHUB_ORG, GITHUB_TOKEN')
         
-        org=GITHUB_ORG
-        user=GITHUB_USER
-        password=GITHUB_PASSWORD
-        # token=GITHUB_ACCESS_TOKEN
-
-        if org is None:
-            org = user
-
-        # if token is not None:
-        #     user = None
-        #     password = None
-
-        gh = github.GitHub(username=user, password=password, access_token=None)
-
-        for item in gh.orgs('gepardec/repos?type=public&sort=created').get():
-            print(item.name)
+        gh = github.GitHub(access_token=GITHUB_TOKEN)
+        result = []
+        for item in gh.orgs('gepardec/repos?type=public').get():
             try:
-                gh.repos(org, item.name).collaborators(user).get()
-                views_14_days = gh.repos(org, item.name).traffic.views.get()
-                for view_per_day in views_14_days['views']:
+                views_14_days = gh.repos(GITHUB_ORG, item.name).traffic.views.get()
+                for view_per_day in views_14_days['views']:                    
+                    # Convert String Timestamp to Unix String looks like: 2020-06-18T00:00:00Z
+                    unixtime = time.mktime(datetime.datetime.strptime(view_per_day['timestamp'], '%Y-%m-%dT%H:%M:%SZ').timetuple())
+                    print(f"INSERT INTO repostats(repo, viewDate, viewCount, uniques) VALUES ('{GITHUB_ORG}/{item.name}', {int(unixtime)}, {view_per_day['count']}, {view_per_day['uniques']})")
+                    try:
+                        result.append(self.executeQueryJson(f"INSERT INTO repostats(repo, viewDate, viewCount, uniques) OUTPUT INSERTED.repo,INSERTED.viewDate,INSERTED.viewCount,INSERTED.uniques VALUES ('{GITHUB_ORG}/{item.name}', {int(unixtime)}, {int(view_per_day['count'])}, {int(view_per_day['uniques'])})"))
+                    except:
+                        # print(f"UPDATE repostats SET viewCount = {int(view_per_day['count'])}, uniques = {int(view_per_day['uniques'])} OUTPUT INSERTED.repo,INSERTED.viewDate,INSERTED.viewCount,INSERTED.uniques WHERE repo = '{GITHUB_ORG}/{item.name}' AND viewDate = {int(unixtime)}")
+                        result.append(self.executeQueryJson(f"UPDATE repostats SET viewCount = {int(view_per_day['count'])}, uniques = {int(view_per_day['uniques'])} OUTPUT INSERTED.repo,INSERTED.viewDate,INSERTED.viewCount,INSERTED.uniques WHERE repo = '{GITHUB_ORG}/{item.name}' AND viewDate = {int(unixtime)}"))
+
                     timestamp = view_per_day['timestamp']
                     data = { 'uniques': view_per_day['uniques'], 'count': view_per_day['count']}    
-                    print(timestamp, item.name, data)
+                    print(item.name, timestamp, data)
             except:
-                print("no access")
+                print(item.name,"no access",file=sys.stderr)
     
         # result = self.executeQueryJson(f"SELECT ID,habit,occured FROM habits WHERE CONVERT(VARCHAR, habit) = '{habit}' ORDER BY occured DESC")   
-        return {}, 200
+        return result, 200
 
     def post(self):   
         return self.get()
 
 class GitHubViewTraffic(Queryable):
     def get(self):   
-        return {}, 200
+        result = self.executeQueryJson(f"SELECT repo,viewDate,viewCount,uniques FROM repostats ORDER BY viewDate DESC")   
+        return result, 200
 
     def post(self):   
         return self.get()
     
 # Create API routes
-api.add_resource(GitHubTrafficCheck, '/check')
+api.add_resource(GitHubTrafficCheck, '/collect')
 api.add_resource(GitHubViewTraffic, '/views')
