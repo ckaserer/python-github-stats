@@ -6,3 +6,4 @@ flask
 flask-restful
 pyodbc
 flask-cors
+requests
