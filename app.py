@@ -9,6 +9,8 @@ import github
 import json
 from typing import TypeVar
 from flask_cors import CORS
+import requests
+
 
 
 # Initialize Flask
@@ -25,6 +27,9 @@ conn = pyodbc.connect(os.environ['WWIF'])
 
 GITHUB_ORG = os.getenv('GITHUB_ORG', None)
 GITHUB_TOKEN = os.getenv('GITHUB_TOKEN', None)
+SUBSCRIPTION_ID = os.getenv('SUBSCRIPTION_ID', None)
+DB_SERVER = os.getenv('DB_SERVER', None)
+DB_NAME = os.getenv('DB_NAME', None)
 
 class Queryable(Resource):
     def executeQueryJson(self, myquery):
@@ -76,6 +81,7 @@ class GitHubTrafficCheck(Queryable):
 
 class GitHubViewTraffic(Queryable):
     def get(self, org, repo):   
+        requests.post("https://management.azure.com/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/databases/providers/Microsoft.Sql/servers/{DB_SERVER}/databases/{DB_NAME}/resume?api-version=2017-10-01-preview")
         result = self.executeQueryJson(f"SELECT repo,viewDate,viewCount,uniques FROM repostats WHERE repo = '{org}/{repo}' ORDER BY viewDate DESC")   
         return result, 200
 
