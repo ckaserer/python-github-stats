@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Make sure these values are correct for your environment
 resourceGroup="github-api"
-appName="github-api"
+appName="gepardec-github-api"
 location="eastus2" 
 
 # Change this if you are using your own github repository
@@ -23,12 +23,17 @@ az appservice plan create \
 az webapp create \
     -g $resourceGroup \
     -n $appName \
-    --plan "linux-plan" \
-    --runtime "PYTHON|3.7" \
+    --plan 'linux-plan' \
+    --runtime 'PYTHON|3.8' \
     --deployment-source-url $gitSource \
     --deployment-source-branch master
 
 az webapp config appsettings set \
     -g $resourceGroup \
     -n $appName \
-    --settings WWIF="$SQLAZURECONNSTR_WWIF"
+    --settings GITHUB_ORG="$GITHUB_ORG" \
+      GITHUB_TOKEN="$GITHUB_TOKEN" \
+      SUBSCRIPTION_ID="$SUBSCRIPTION_ID" \
+      DB_SERVER="$DB_SERVER" \
+      DB_NAME="$DB_NAME" \
+      WWIF="$WWIF"
